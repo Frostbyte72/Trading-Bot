@@ -4,25 +4,25 @@ gets sentiment from twitter and needs something to get sentiment from a more pro
 users potentionaly lse forums but there are other social media that is better.
 
 finds shares with poitve sentiment to invest in then sells when sentiment lowers better to do
-through cahnge in sentiment rather than actual value as this will have a greater effect on price fluctaions
+through change in sentiment rather than actual value as this will have a greater effect on price fluctuations
 rather than price.
 
 Hopefully market sentiment through professional social media will see when the market is going to turn
-before it does so ican optimise selling point and also oppourtunities where professional and
+before it does so i can optimise selling point and also opportunities where professional and
 casual sentiment differ so much.
 
 --- FACTORS ---
 Size = smaller companies tend to have higher returns but this comes with added risk this should be taken into
-account when deciding how good the opurtunity is. if a small company has the same variation in the expected
-price as a large company then the large company is the same opurtunity with lower risk
+account when deciding how good the opportunity is. if a small company has the same variation in the expected
+price as a large company then the large company is the same opportunity with lower risk
 
-Value = value of price to earnings. price per earnings lower price per earning ussualy means you are getting 
+Value = value of price to earnings. price per earnings lower price per earning usually means you are getting 
 a good deal more bang for your buck. where as companies which have a high price per earnings often have high 
 growth or growth expectations circa 85% of stocks with this do have high growth in the future.
 
-Quality = high and stable earnings such as coca cola or walmart have high quality as they have highly 
+Quality = high and stable earnings such as coca cola or Walmart have high quality as they have highly 
 profitable and stable earnings.
 
-Momentum = momentum are stocks that have done well over the past 6-12 mounths. companies that have 
-performed well in the last month tend not to do as well. price momentum stocks performing well. postive price
-momentum has a much larger effect than negtive price momentum
+Momentum = momentum are stocks that have done well over the past 6-12 months. companies that have 
+performed well in the last month tend not to do as well. price momentum stocks performing well. positive price
+momentum has a much larger effect than negative price momentum

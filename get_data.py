@@ -8,6 +8,7 @@ import pandas as pd
 import sqlite3
 from tqdm import tqdm
 import os
+import keyboard
 
 def get_price_data(symbol):
     stock = yf.Ticker(symbol)
@@ -27,6 +28,13 @@ def get_stock_info(symbol):
     info = info.reindex(index = ['symbol','longName','category','longBusinessSummary'])
 
     return info
+
+def get_price(symbol):
+    stock = yf.Ticker(symbol)
+    print(stock.info)
+    market_price = stock.info['regularMarketPrice']
+
+    return market_price
 
 def Insert_Into_db(cursor,con,Values,SQL):
    
@@ -85,20 +93,31 @@ def connect_to_db():
                     Volume INTEGER,
                     PRIMARY KEY (Name, Date));''')
 
+    try:
+        cursor.execute('''SELECT 1 FROM DAY_PRICE''')
+    except Exception as e:
+        print('DAY_PRICE NOT FOUND CONFIGURING')
+        cursor.execute('''CREATE TABLE DAY_PRICE
+                    (Name TEXT,
+                    Date TEXT,
+                    price REAL,
+                    PRIMARY KEY (Name, Date));''')
+
     print("DB SUCESSFULLY CONFIGURED")
 
     return con,cursor
 
-def cls():
+def clear():
     os.system('cls' if os.name=='nt' else 'clear')
-
+    return
     
-def main(i):
+def main():
+    i = input("Initialise company data Setup? (y/n): ")
     symbols = get_symbols()
 
     con,cursor = connect_to_db()
 
-    
+    #Redownload all prices history from stocks in the CSV  
     if i == "y":
         for index, name in symbols.items():
             print("Getting Company Data for", name)
@@ -108,24 +127,32 @@ def main(i):
             if Values[1] == None:
                 print("Record has no symbol cannot be inserted")
                 break
-            Insert_Into_db(cursor,con,info.Values,'''INSERT INTO STOCKS(Symbol,Name,Catagory,Summary,Sentiment,Weighted_Sentiment) VALUES(?,?,?,?,?,?) ''')
+            Insert_Into_db(cursor,con,Values,'''INSERT INTO STOCKS(Symbol,Name,Catagory,Summary,Sentiment,Weighted_Sentiment) VALUES(?,?,?,?,?,?) ''')
     
-    print("---Updating Price Data---")
-    #change to get name from sql database so that with mismatch in records price history still works
-    cursor.execute("SELECT Symbol FROM Stocks")
-    symbols = cursor.fetchall()
-    
-    for symbol in tqdm(symbols, desc = 'tqdm() Progress Bar'):
-        #print("Getting Price history for", symbol[0])
-        data = get_price_data(symbol[0])
-        for row in data.iterrows():
-            Values = []
-            Values.append(symbol[0])
-            Values.append(row[0].strftime('%Y-%m-%d %X'))
-            Values.extend(row[1].tolist())
-            Insert_Into_db(cursor,con,Values,'''Insert INTO Prices(Name,Date ,Open,High,Low,Close,Volume) VALUES(?,?,?,?,?,?,?) ''')
-    print("---Avalible Price History Collected---")
+    i = input("Update Price Data ? (y/n): ")
+    if i == "y":
+        #Update all price data of existing stocks in the table
+        print("---Updating Price Data---")
+        #change to get name from sql database so that with mismatch in records price history still works
+        cursor.execute("SELECT Symbol FROM Stocks")
+        symbols = cursor.fetchall()
+        
+        for symbol in tqdm(symbols, desc = 'Update Progress'):
+            #print("Getting Price history for", symbol[0])
+            data = get_price_data(symbol[0])
+            for row in data.iterrows():
+                Values = []
+                Values.append(symbol[0])
+                Values.append(row[0].strftime('%Y-%m-%d %X'))
+                Values.extend(row[1].tolist())
+                Insert_Into_db(cursor,con,Values,'''Insert INTO Prices(Name,Date ,Open,High,Low,Close,Volume) VALUES(?,?,?,?,?,?,?) ''')
+        print("---Avalible Price History Collected---")
+
+    print("Current Price")
+    price = get_price("AAAU")
+    print(price)
+
 
 if __name__ == '__main__':
-    i = input("Initialsie company data Setup? (y/n): ")
-    main(i)
+    get_stock_info('MSFT')
+    main()

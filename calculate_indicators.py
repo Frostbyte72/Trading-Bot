@@ -1,14 +1,18 @@
 import sqlite3
 import pandas as pd
+#supresses pandas warnings
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
 import datetime
 
 #Explination of indicators
 #https://www.ig.com/uk/trading-strategies/10-trading-indicators-every-trader-should-know-190604
 
-#Calculates the Moving range (200 day)
+#Calculates the Moving range (200 point)
 #price trend over a long period of time
 # avgMR = sum(x1 - x2, ... xk-1 - xk) / k-1
 def calc_mr(stock):
+    #needs sorting by date so it gets the last 200
     data = query('SELECT * FROM TRADE_DATA WHERE Symbol ="{}" LIMIT 200'.format(stock) )
     sum = 0
     for index in range(0,data.shape[0]-1):
@@ -32,18 +36,57 @@ def calc_ema(stock):
 
     return EMA
 
+#can get stuck in a infinite loop if it cant find data points within the intervale due to while loops.
+# as such Interval for RSI should be retrive as a count of records in the databse to avoid infinite loop
 def calc_rsi(symbol,date,interval):
-    #https://www.fmlabs.com/reference/default.htm?url=RSI.htm
+    # https://en.wikipedia.org/wiki/Relative_strength_index
+    # This is cutlers RSI not Wilders RSI as cutlers dosen't change based on the starting point
     current_date = datetime.datetime.strptime(date, '%Y-%m-%d %X')
     print(current_date)
-    for i in range (0,interval):
-        data = query('SELECT * FROM DAILY WHERE Symbol = "{}" AND Date = "{}"'.format(symbol,date))
-        if data == None:
-            print("There is a gap in the data consider changing interval (possible holiday)")
-        current_date = current_date + datetime.timedelta(days=1)
-        print(data)
-         
-    return 
+    u = []
+    d = []
+    for i in range (0,interval-1):
+        point = pd.Series()
+        next_point = pd.Series()
+        # next point is current price 
+        
+        #needed to skip days where the market is closed
+        while point.empty:
+            point = query('SELECT * FROM DAILY WHERE Symbol = "{}" AND Date = "{}"'.format(symbol,current_date))
+            current_date = current_date + datetime.timedelta(days=1)
+        while next_point.empty:
+            next_point = query('SELECT * FROM DAILY WHERE Symbol = "{}" AND Date = "{}"'.format(symbol,current_date))
+            current_date = current_date + datetime.timedelta(days=1)
+
+        if float(point["Close"]) < float(next_point["Close"]):#next point's close
+            #price has gone up
+            u.append(next_point["Close"] - point["Close"])
+            d.append(0)
+        elif float(point["Close"]) > float(next_point["Close"]):
+            #Price has gone down
+            u.append(0)
+            d.append(point["Close"] - next_point["Close"])
+        else:
+            #Price is the same
+            u.append(0)
+            d.append(0)
+
+    #Calcuate SMA of u and d
+
+    utotal = 0
+    dtotal = 0
+    for i in range(0,(interval -1)):
+        utotal += u[i]
+        dtotal += d[i]
+
+    SMAU = utotal/len(u)
+    SMAD = dtotal/len(d)
+
+    RSI = 100 * SMAU/(SMAU+SMAD)
+
+    print(RSI)
+    return float(RSI)
+
 
 #query function for sql database
 #Reuturns rows as pd dataframe
@@ -53,17 +96,20 @@ def query(query):
 
     try:
         data = pd.read_sql_query(query, con)
+        con.close()
         return data
     except Exception as e:
         print(e)
 
+    con.close()
     return
 
 def main():
     symbol = "GOOGL"
-    date = "2023-01-20 00:00:00" 
-    print(calc_mr(symbol))
-    print(calc_ema(symbol))
+    date = "2023-01-01 00:00:00" 
+    #print(calc_mr(symbol))
+    #print(calc_ema(symbol))
+    #Interval for RSI should be retrive as a count of records in the databse to avoid infinite loop
     print(calc_rsi(symbol,date,14))
   
     

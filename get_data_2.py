@@ -179,4 +179,4 @@ def main(symbol):
     return
 
 if __name__ == '__main__':
-    main("AAPL")
+    main("TSLA")

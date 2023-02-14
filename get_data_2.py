@@ -64,7 +64,7 @@ def connect_to_db():
     try:
         cursor.execute('''SELECT 1 FROM TRADE_DATA;''')
     #If not create DB
-    except Exception as e:
+    except:
         print('TRADE_DATA NOT FOUND CONFIGURING')
         cursor.execute('''CREATE TABLE TRADE_DATA
                     (Symbol TEXT,
@@ -78,7 +78,7 @@ def connect_to_db():
 
     try:
         cursor.execute('''SELECT 1 FROM DAILY;''')
-    except Exception as e:
+    except:
         print('DAILY NOT FOUND CONFIGURING')
         cursor.execute('''CREATE TABLE DAILY
                     (Symbol TEXT,
@@ -92,7 +92,7 @@ def connect_to_db():
 
     try:
         cursor.execute('''SELECT 1 FROM OVERVIEW;''')
-    except Exception as e:
+    except:
         print('OVERVIEW NOT FOUND CONFIGURING')
         cursor.execute('''CREATE TABLE OVERVIEW
                     (Symbol TEXT PRIMARY KEY,

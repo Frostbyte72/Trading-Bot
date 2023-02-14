@@ -8,7 +8,7 @@ import datetime
 #Explination of indicators
 #https://www.ig.com/uk/trading-strategies/10-trading-indicators-every-trader-should-know-190604
 
-#Calculates the Moving range (200 point)
+#Calculates the Moving range
 #price trend over a long period of time
 # avgMR = sum(x1 - x2, ... xk-1 - xk) / k-1
 def calc_mr(stock,limit):
@@ -125,8 +125,6 @@ def main():
     print(calc_ema(symbol))
     #Interval for RSI should be retrive as a count of records in the databse to avoid infinite loop
     print(calc_rsi(symbol,date,14))
-  
-    
 
 
 if __name__ == "__main__":

@@ -11,9 +11,9 @@ import datetime
 #Calculates the Moving range (200 point)
 #price trend over a long period of time
 # avgMR = sum(x1 - x2, ... xk-1 - xk) / k-1
-def calc_mr(stock):
+def calc_mr(stock,limit):
     #needs sorting by date so it gets the last 200
-    data = query('SELECT * FROM TRADE_DATA WHERE Symbol ="{}" LIMIT 200'.format(stock) )
+    data = query('SELECT * FROM DAILY WHERE Symbol ="{}" ORDER BY Date DESC LIMIT {}'.format(stock,limit) )
     sum = 0
     for index in range(0,data.shape[0]-1):
         sum = sum + (float(data['Close'].iloc[index]) - float(data['Close'].iloc[index+1]))
@@ -36,13 +36,25 @@ def calc_ema(stock):
 
     return EMA
 
+def price_sma(stock,interval):
+    data = query('SELECT * FROM DAILY WHERE Symbol ="{}" ORDER BY Date ASC'.format(stock) )
+    data['SMA'] = data['Close'].rolling(window=interval).mean()
+
+    return data
+
+def volume_sma(stock,interval):
+    data = query('SELECT * FROM DAILY WHERE Symbol ="{}" ORDER BY Date ASC'.format(stock) )
+    data['SMA'] = data['Volume'].rolling(window=interval).mean()
+
+    return data
+
+#Takes a stock,date and interval then claculates the RSI for that interval moving forward.
 #can get stuck in a infinite loop if it cant find data points within the intervale due to while loops.
 # as such Interval for RSI should be retrive as a count of records in the databse to avoid infinite loop
 def calc_rsi(symbol,date,interval):
     # https://en.wikipedia.org/wiki/Relative_strength_index
     # This is cutlers RSI not Wilders RSI as cutlers dosen't change based on the starting point
     current_date = datetime.datetime.strptime(date, '%Y-%m-%d %X')
-    print(current_date)
     u = []
     d = []
     for i in range (0,interval-1):
@@ -99,16 +111,18 @@ def query(query):
         con.close()
         return data
     except Exception as e:
-        print(e)
+        print("ERROR WHILE EXECUTING SQL: {}".format(e))
 
     con.close()
     return
 
 def main():
     symbol = "GOOGL"
-    date = "2023-01-01 00:00:00" 
-    #print(calc_mr(symbol))
-    #print(calc_ema(symbol))
+    date = "2023-01-01 00:00:00"
+    print(price_sma(symbol,14)) 
+    print(volume_sma(symbol,14))
+    print(calc_mr(symbol,14))
+    print(calc_ema(symbol))
     #Interval for RSI should be retrive as a count of records in the databse to avoid infinite loop
     print(calc_rsi(symbol,date,14))
   

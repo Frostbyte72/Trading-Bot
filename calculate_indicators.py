@@ -1,5 +1,6 @@
 import sqlite3
 import pandas as pd
+import datetime
 
 #Explination of indicators
 #https://www.ig.com/uk/trading-strategies/10-trading-indicators-every-trader-should-know-190604
@@ -31,6 +32,19 @@ def calc_ema(stock):
 
     return EMA
 
+def calc_rsi(symbol,date,interval):
+    #https://www.fmlabs.com/reference/default.htm?url=RSI.htm
+    current_date = datetime.datetime.strptime(date, '%Y-%m-%d %X')
+    print(current_date)
+    for i in range (0,interval):
+        data = query('SELECT * FROM DAILY WHERE Symbol = "{}" AND Date = "{}"'.format(symbol,date))
+        if data == None:
+            print("There is a gap in the data consider changing interval (possible holiday)")
+        current_date = current_date + datetime.timedelta(days=1)
+        print(data)
+         
+    return 
+
 #query function for sql database
 #Reuturns rows as pd dataframe
 def query(query):
@@ -47,8 +61,11 @@ def query(query):
 
 def main():
     symbol = "GOOGL"
+    date = "2023-01-20 00:00:00" 
     print(calc_mr(symbol))
     print(calc_ema(symbol))
+    print(calc_rsi(symbol,date,14))
+  
     
 
 

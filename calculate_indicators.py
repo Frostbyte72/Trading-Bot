@@ -4,6 +4,8 @@ import pandas as pd
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 import datetime
+from get_data_2 import Insert_Into_db
+import talib
 
 #Explination of indicators
 #https://www.ig.com/uk/trading-strategies/10-trading-indicators-every-trader-should-know-190604
@@ -115,6 +117,7 @@ def query(query):
 
     con.close()
     return
+
 
 def main():
     symbol = "GOOGL"

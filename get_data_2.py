@@ -17,7 +17,7 @@ import os
 def get_daily(symbol):
     ts = TimeSeries(key='BOH0A1X1EXCT3F1Y',output_format='pandas')
     # Get json object with the intraday data and another with  the call's metadata
-    data, meta_data = ts.get_daily_adjusted(symbol = str(symbol), outputsize='compact')
+    data, meta_data = ts.get_daily_adjusted(symbol = str(symbol), outputsize='full')
     data = data.drop(columns=['5. adjusted close', '7. dividend amount', '8. split coefficient'])
     data.head()
 
@@ -41,6 +41,7 @@ def get_price(symbol):
     #Needs scrapping from somehwere no API SUPPORT
     print()
 
+####### Needs changing to add in historical overviews for fundemnetal analyasis for the day to day price prediction. ######
 def get_overview(symbol):
     fd = FundamentalData(key='BOH0A1X1EXCT3F1Y')
     data = fd.get_company_overview(symbol)
@@ -179,4 +180,4 @@ def main(symbol):
     return
 
 if __name__ == '__main__':
-    main("TSLA")
+    main("TLSA")

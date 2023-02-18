@@ -1,6 +1,3 @@
-import yfinance as yf
+from yahoo_finance import Share
 
-msft = yf.Ticker("MSFT")
-
-print(msft.cashflow)
-print(msft.earnings)
+stock = Share("GOOGL")

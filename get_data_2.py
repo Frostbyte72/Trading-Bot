@@ -12,6 +12,8 @@ import pandas as pd
 import sqlite3
 from tqdm import tqdm
 import os
+import requests
+
 
 #Only gets last full days worth of data
 def get_daily(symbol):
@@ -51,6 +53,28 @@ def get_overview(symbol):
 
     print(data)
     return data
+
+def get_income_statments(symbol):
+    url = 'https://www.alphavantage.co/query?function=INCOME_STATEMENT&symbol=IBM&apikey=BOH0A1X1EXCT3F1Y'
+    r = requests.get(url)
+    raw_data = r.json()
+    data = pd.DataFrame(raw_data.get("quarterlyReports"))
+    data = data[['fiscalDateEnding','grossProfit','totalRevenue','operatingIncome','netIncome','ebitda']]
+
+    print(data)
+    return data
+
+def get_balance_sheets(symbol):
+    url = 'https://www.alphavantage.co/query?function=BALANCE_SHEET&symbol=IBM&apikey=BOH0A1X1EXCT3F1Y'
+    r = requests.get(url)
+    raw_data = r.json()
+
+    data = pd.DataFrame(raw_data.get("quarterlyReports"))
+    data = data[['fiscalDateEnding','totalAssets','totalCurrentAssets','invesmtents','totalLiabilities','totalShareholderEquity','treasuryStock','retainedEarnings','commonStock','commonStockSharesOutstanding']]
+
+    print(list(data.columns))
+
+    return
 
 def connect_to_db():
     # connect to Databse
@@ -146,6 +170,11 @@ def main(symbol):
 
     con , cursor = connect_to_db()
 
+    #Collecting Fundemental anyalsis data
+    data = get_income_statments(symbol)
+    get_balance_sheets(symbol)
+    return
+
     ### Update/get Company Overview
     print("Updating company ovierview for {}".format(symbol)) 
     data = get_overview(symbol)
@@ -155,6 +184,7 @@ def main(symbol):
     cursor.execute('DELETE FROM OVERVIEW WHERE Symbol == "{}";'.format(symbol))
     Insert_Into_db(cursor,con,values,'''Insert INTO OVERVIEW(Symbol,MarketCapitalization,EBITDA,PERatio,PEGRatio,BookValue,DividendPerShare,DividendYield,EPS,RevenuePerShareTTM,ProfitMargin,OperatingMarginTTM,ReturnOnAssetsTTM,ReturnOnEquityTTM,RevenueTTM,GrossProfitTTM,QuarterlyEarningsGrowthYOY,QuarterlyRevenueGrowthYOY,AnalystTargetPrice,EVToRevenue,FiftyTwoWeekHigh,FiftyTwoWeekLow,FiftyDayMovingAverage,TwoHunderedDayMovingAverage,SharesOutstanding) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ''')
 
+    #Collecting data for Techincal anyalsis
     ### Update/get last months minuite by minuite trades
     print("inserting the following records for {} :".format(symbol))
     data = get_historic_data(symbol)
@@ -180,4 +210,4 @@ def main(symbol):
     return
 
 if __name__ == '__main__':
-    main("TLSA")
+    main("GOOGL")

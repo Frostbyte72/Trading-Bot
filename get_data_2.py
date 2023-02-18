@@ -14,7 +14,6 @@ from tqdm import tqdm
 import os
 import requests
 
-
 #Only gets last full days worth of data
 def get_daily(symbol):
     ts = TimeSeries(key='BOH0A1X1EXCT3F1Y',output_format='pandas')
@@ -55,7 +54,7 @@ def get_overview(symbol):
     return data
 
 def get_income_statments(symbol):
-    url = 'https://www.alphavantage.co/query?function=INCOME_STATEMENT&symbol=IBM&apikey=BOH0A1X1EXCT3F1Y'
+    url = 'https://www.alphavantage.co/query?function=INCOME_STATEMENT&symbol={}&apikey=BOH0A1X1EXCT3F1Y'.format(symbol)
     r = requests.get(url)
     raw_data = r.json()
     data = pd.DataFrame(raw_data.get("quarterlyReports"))
@@ -65,16 +64,29 @@ def get_income_statments(symbol):
     return data
 
 def get_balance_sheets(symbol):
-    url = 'https://www.alphavantage.co/query?function=BALANCE_SHEET&symbol=IBM&apikey=BOH0A1X1EXCT3F1Y'
+    url = 'https://www.alphavantage.co/query?function=BALANCE_SHEET&symbol={}&apikey=BOH0A1X1EXCT3F1Y'.format(symbol)
     r = requests.get(url)
     raw_data = r.json()
 
     data = pd.DataFrame(raw_data.get("quarterlyReports"))
-    data = data[['fiscalDateEnding','totalAssets','totalCurrentAssets','invesmtents','totalLiabilities','totalShareholderEquity','treasuryStock','retainedEarnings','commonStock','commonStockSharesOutstanding']]
+    data = data[['fiscalDateEnding','totalAssets','totalCurrentAssets','investments','totalLiabilities','totalShareholderEquity','treasuryStock','retainedEarnings','commonStock','commonStockSharesOutstanding']]
 
-    print(list(data.columns))
 
-    return
+    print(data)
+
+    return data
+
+def get_cash_flow(symbol):
+    url = 'https://www.alphavantage.co/query?function=CASH_FLOW&symbol={}&apikey=BOH0A1X1EXCT3F1Y'.format(symbol)
+    r = requests.get(url)
+    raw_data = r.json()
+    
+    data = pd.DataFrame(raw_data.get("quarterlyReports"))
+    
+    data = data[['fiscalDateEnding','operatingCashflow','profitLoss','paymentsForRepurchaseOfCommonStock','paymentsForRepurchaseOfPreferredStock','dividendPayout','proceedsFromIssuanceOfCommonStock','proceedsFromIssuanceOfPreferredStock','cashflowFromInvestment','changeInCashAndCashEquivalents']]
+
+    print(data)
+    return data
 
 def connect_to_db():
     # connect to Databse
@@ -165,15 +177,35 @@ def Insert_Into_db(cursor,con,Values,SQL):
 
 
 def main(symbol):
-    
-    
 
     con , cursor = connect_to_db()
 
     #Collecting Fundemental anyalsis data
-    data = get_income_statments(symbol)
-    get_balance_sheets(symbol)
-    return
+    income = get_income_statments(symbol)
+    balance = get_balance_sheets(symbol)
+    cash = get_cash_flow(symbol)
+    #join the fundmental data together
+    temp = pd.merge(income,balance, how="left", on="fiscalDateEnding")
+    fundamentals = pd.merge(temp,cash, how="left", on="fiscalDateEnding")
+    print(fundamentals)
+    
+    #0 = ROE (return on equity) , 1 = Profit Margin ,2 = ROI return on investment
+    calculated = [[],[],[]]
+    for i in range(0,fundamentals.shape[0]):
+        ROE = float(fundamentals['netIncome'].iloc[i])/( (float(fundamentals['totalAssets'].iloc[i])) - float(fundamentals['totalLiabilities'].iloc[i]) )
+        calculated[0].append(ROE)
+        
+        profit_margin = float(fundamentals['grossProfit'].iloc[i] ) / float(fundamentals['totalRevenue'].iloc[i])
+        calculated[1].append(profit_margin)
+
+        ROI = float(fundamentals['cashflowFromInvestment'].iloc[i]) / float(fundamentals['investments'].iloc[i])
+        calculated[2].append(ROI)
+
+    print("FINIAL FUNDEMAMENTALS")
+    fundamentals['ROE'] = calculated[0]
+    fundamentals['profitMargin'] = calculated[1]
+    print(fundamentals)
+    
 
     ### Update/get Company Overview
     print("Updating company ovierview for {}".format(symbol)) 
@@ -194,6 +226,10 @@ def main(symbol):
         values.append(row[0])
         values.extend(row[1].tolist())
         Insert_Into_db(cursor,con,values,'''Insert INTO TRADE_DATA(Symbol,Date,Open,High,Low,Close,Volume) VALUES(?,?,?,?,?,?,?) ''')
+
+    print("---------------------------- REMOVE IF ACADEMIC ACCOUNT IS GRANTED ---------------------------------")
+    import time
+    time.sleep(60)
 
     ### Update/Get day by day prices from the last 100 days
     daily = get_daily(symbol)

@@ -189,8 +189,8 @@ def main(symbol):
     fundamentals = pd.merge(temp,cash, how="left", on="fiscalDateEnding")
     print(fundamentals)
     
-    #0 = ROE (return on equity) , 1 = Profit Margin ,2 = ROI return on investment
-    calculated = [[],[],[]]
+    #0 = return on equity (ROE) , 1 = Profit Margin ,2 = return on investment (ROI), 3 = dividends per share (DPS)
+    calculated = [[],[],[],[]]
     for i in range(0,fundamentals.shape[0]):
         ROE = float(fundamentals['netIncome'].iloc[i])/( (float(fundamentals['totalAssets'].iloc[i])) - float(fundamentals['totalLiabilities'].iloc[i]) )
         calculated[0].append(ROE)
@@ -201,11 +201,20 @@ def main(symbol):
         ROI = float(fundamentals['cashflowFromInvestment'].iloc[i]) / float(fundamentals['investments'].iloc[i])
         calculated[2].append(ROI)
 
+        if fundamentals['dividendPayout'].iloc[i] == 'None':
+            DPS = 0
+        else:
+            DPS = float(fundamentals['dividendPayout'].iloc[i]) / (float(fundamentals['commonStock'].iloc[i]))
+        calculated[3].append(DPS)
+
     print("FINIAL FUNDEMAMENTALS")
     fundamentals['ROE'] = calculated[0]
     fundamentals['profitMargin'] = calculated[1]
+    fundamentals['ROI'] = calculated[2]
+    fundamentals['DPS'] = calculated[3]
     print(fundamentals)
-    
+
+    return    
 
     ### Update/get Company Overview
     print("Updating company ovierview for {}".format(symbol)) 

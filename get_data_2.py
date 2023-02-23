@@ -19,10 +19,24 @@ def get_daily(symbol):
     ts = TimeSeries(key='BOH0A1X1EXCT3F1Y',output_format='pandas')
     # Get json object with the intraday data and another with  the call's metadata
     data, meta_data = ts.get_daily_adjusted(symbol = str(symbol), outputsize='full')
-    data = data.drop(columns=['5. adjusted close', '7. dividend amount', '8. split coefficient'])
-    data.head()
+    
+    #Scale other values to account for stock splits
+    adjusted_data = pd.DataFrame()
+    for i, row in data.iterrows():
+        row['Date'] = i.strftime('%Y-%m-%d %X')
+        split_coefficient = (float(row['5. adjusted close']) / float(row['4. close']))
+        row['1. open'] = row['1. open'] * split_coefficient
+        row['2. high'] = row['2. high'] * split_coefficient
+        row['3. low'] = row['3. low'] * split_coefficient    
+        row['6. volume'] = row['6. volume'] * split_coefficient
+        adjusted_data = adjusted_data.append(row,ignore_index=True)
+    
+    #set close as the adjusted close to account for stock splits
+    adjusted_data['4. close'] = adjusted_data['5. adjusted close']
 
-    return data
+    #drop unessecary columns
+    adjusted_data = adjusted_data.drop(columns=['5. adjusted close', '7. dividend amount', '8. split coefficient'])
+    return adjusted_data
 
 #Gets the last months trading data minute by minuite
 def get_historic_data(symbol):
@@ -158,6 +172,43 @@ def connect_to_db():
                     TwoHunderedDayMovingAverage REAL,
                     SharesOutstanding REAL)''')
 
+    try:
+        cursor.execute('''SELECT 1 FROM FUNDEMENTAL;''')
+    except:
+        print('OVERVIEW NOT FOUND CONFIGURING')
+        cursor.execute('''CREATE TABLE FUNDEMENTAL
+                    (Symbol TEXT,
+                    fiscalDateEnding TEXT,
+                    grossProfit REAL,
+                    totalRevenue REAL,
+                    operatingIncome REAL,
+                    netIncome REAL,
+                    ebitda REAL,
+                    totalAssets REAL,
+                    totalCurrentAssets REAL,
+                    investments REAL,
+                    totalLiabilities REAL,
+                    totalShareholderEquity REAL,
+                    treasuryStock REAL,
+                    retainedEarnings REAL,
+                    commonStock INTEGER,
+                    commonStockSharesOutstanding INTEGER,
+                    operatingCashflow REAL,
+                    profitLoss REAL,
+                    paymentsForRepurchaseOfCommonStock REAL,
+                    paymentsForRepurchaseOfPreferredStock REAL,
+                    dividendPayout REAL,
+                    proceedsFromIssuanceOfCommonStock REAL,
+                    proceedsFromIssuanceOfPreferredStock REAL, 
+                    cashflowFromInvestment REAL,
+                    changeInCashAndCashEquivalents REAL ,
+                    ROE REAL,
+                    profitMargin REAL,
+                    ROI REAL,
+                    DPS REAL,
+                    PRIMARY KEY (Symbol, fiscalDateEnding))''')
+
+
     return con,cursor
 
 def Insert_Into_db(cursor,con,Values,SQL):
@@ -167,8 +218,8 @@ def Insert_Into_db(cursor,con,Values,SQL):
         print(Values)
         con.commit()
     except Exception as e:
-        if str(e) == "UNIQUE constraint failed: TRADE_DATA.Symbol, TRADE_DATA.Date" or str(e) == "UNIQUE constraint failed: DAILY.Symbol, DAILY.Date" or str(e) == "UNIQUE constraint failed: OVERVIEW.Symbol":
-            return
+        if str(e) == "UNIQUE constraint failed: TRADE_DATA.Symbol, TRADE_DATA.Date" or str(e) == "UNIQUE constraint failed: DAILY.Symbol, DAILY.Date" or str(e) == "UNIQUE constraint failed: OVERVIEW.Symbol" or str(e) == "UNIQUE constraint failed: FUNDEMENTAL.Symbol, FUNDEMENTAL.fiscalDateEnding":
+            return True
         else:
             print("ERROR when inserting Values: {}".format(e))
             return False
@@ -207,23 +258,33 @@ def main(symbol):
             DPS = float(fundamentals['dividendPayout'].iloc[i]) / (float(fundamentals['commonStock'].iloc[i]))
         calculated[3].append(DPS)
 
-    print("FINIAL FUNDEMAMENTALS")
     fundamentals['ROE'] = calculated[0]
     fundamentals['profitMargin'] = calculated[1]
     fundamentals['ROI'] = calculated[2]
     fundamentals['DPS'] = calculated[3]
-    print(fundamentals)
 
-    return    
+    for row in fundamentals.iterrows():
+        values = []
+        values.append(symbol)
+        for i in range(0,row[1].size):
+            if row[1].iloc[i] == 'None':
+                row[1].iloc[i] =  None
+            else:
+                continue
+        values.extend(row[1].tolist())
+        
+        Insert_Into_db(cursor,con,values,'''Insert INTO FUNDEMENTAL(Symbol,fiscalDateEnding, grossProfit, totalRevenue, operatingIncome, netIncome, ebitda, totalAssets, totalCurrentAssets, investments, totalLiabilities, totalShareholderEquity, treasuryStock, retainedEarnings, commonStock, commonStockSharesOutstanding, operatingCashflow, profitLoss, paymentsForRepurchaseOfCommonStock, paymentsForRepurchaseOfPreferredStock, dividendPayout, proceedsFromIssuanceOfCommonStock, proceedsFromIssuanceOfPreferredStock, cashflowFromInvestment, changeInCashAndCashEquivalents, ROE, profitMargin, ROI, DPS) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ''')
+
 
     ### Update/get Company Overview
+    """
     print("Updating company ovierview for {}".format(symbol)) 
     data = get_overview(symbol)
     values = []
     values.append(symbol)
     values.extend(data.tolist())
     cursor.execute('DELETE FROM OVERVIEW WHERE Symbol == "{}";'.format(symbol))
-    Insert_Into_db(cursor,con,values,'''Insert INTO OVERVIEW(Symbol,MarketCapitalization,EBITDA,PERatio,PEGRatio,BookValue,DividendPerShare,DividendYield,EPS,RevenuePerShareTTM,ProfitMargin,OperatingMarginTTM,ReturnOnAssetsTTM,ReturnOnEquityTTM,RevenueTTM,GrossProfitTTM,QuarterlyEarningsGrowthYOY,QuarterlyRevenueGrowthYOY,AnalystTargetPrice,EVToRevenue,FiftyTwoWeekHigh,FiftyTwoWeekLow,FiftyDayMovingAverage,TwoHunderedDayMovingAverage,SharesOutstanding) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ''')
+    Insert_Into_db(cursor,con,values,'''Insert INTO OVERVIEW(Symbol,MarketCapitalization,EBITDA,PERatio,PEGRatio,BookValue,DividendPerShare,DividendYield,EPS,RevenuePerShareTTM,ProfitMargin,OperatingMarginTTM,ReturnOnAssetsTTM,ReturnOnEquityTTM,RevenueTTM,GrossProfitTTM,QuarterlyEarningsGrowthYOY,QuarterlyRevenueGrowthYOY,AnalystTargetPrice,EVToRevenue,FiftyTwoWeekHigh,FiftyTwoWeekLow,FiftyDayMovingAverage,TwoHunderedDayMovingAverage,SharesOutstanding) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ''')"""
 
     #Collecting data for Techincal anyalsis
     ### Update/get last months minuite by minuite trades
@@ -236,18 +297,13 @@ def main(symbol):
         values.extend(row[1].tolist())
         Insert_Into_db(cursor,con,values,'''Insert INTO TRADE_DATA(Symbol,Date,Open,High,Low,Close,Volume) VALUES(?,?,?,?,?,?,?) ''')
 
-    print("---------------------------- REMOVE IF ACADEMIC ACCOUNT IS GRANTED ---------------------------------")
-    import time
-    time.sleep(60)
-
     ### Update/Get day by day prices from the last 100 days
     daily = get_daily(symbol)
-    for row in daily.iterrows():
+    for _,row in daily.iterrows():
         values = []
         values.append(symbol)
-        values.append(row[0].strftime('%Y-%m-%d %X'))
-        values.extend(row[1].tolist())
-        Insert_Into_db(cursor,con,values,'''Insert INTO DAILY(Symbol,Date,Open,High,Low,Close,Volume) VALUES(?,?,?,?,?,?,?) ''')
+        values.extend(row.tolist())
+        Insert_Into_db(cursor,con,values,'''Insert INTO DAILY(Symbol,Open,High,Low,Close,Volume,Date) VALUES(?,?,?,?,?,?,?) ''')
 
     con.close()
     print("DATA UPDATED")

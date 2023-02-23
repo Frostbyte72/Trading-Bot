@@ -84,6 +84,9 @@ def main():
     indicators['RSI_7'] = calc_rsi(symbol,7)
 
     print(indicators)
+    
+
+    return indicators
 
 if __name__ == "__main__":
     main()

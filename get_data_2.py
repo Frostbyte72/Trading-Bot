@@ -249,7 +249,10 @@ def main(symbol):
         profit_margin = float(fundamentals['grossProfit'].iloc[i] ) / float(fundamentals['totalRevenue'].iloc[i])
         calculated[1].append(profit_margin)
 
-        ROI = float(fundamentals['cashflowFromInvestment'].iloc[i]) / float(fundamentals['investments'].iloc[i])
+        if fundamentals['investments'].iloc[i] == 'None':
+            ROI = 0
+        else:
+            ROI = float(fundamentals['cashflowFromInvestment'].iloc[i]) / float(fundamentals['investments'].iloc[i])
         calculated[2].append(ROI)
 
         if fundamentals['dividendPayout'].iloc[i] == 'None':

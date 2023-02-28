@@ -41,7 +41,7 @@ def organise_data(symbol):
         training_data = training_data.append(row,ignore_index=True)
 
     #removes the frist row for the last known day of trading as we don't yet know tommorows close so it can have no taget value and thus useless training
-    training_data.drop(index = 0,axis=0,inplace=True)
+    #training_data.drop(index = 0,axis=0,inplace=True)
 
     #Removes all columns that have null values or are all zero
     for col in list(training_data.columns):
@@ -57,23 +57,30 @@ def organise_data(symbol):
 
 def create_model(training_data):
     target = training_data['Target']
+    
+    test = pd.DataFrame()
+    test = test.append(training_data.iloc[0])
+
     training_data.drop(labels=['Symbol','Date','fiscalDateEnding','Target'],axis = 1,inplace =True)
-    
-    
-    dimensions = training_data.shape[-1] #34 for google
+
+    training_data.drop(index = 0,axis=0,inplace=True)
+    target.drop(index = 0,axis=0,inplace=True)
+
+    dimensions = training_data.shape[-1] #the size of the datframe's columns after redundent columns have been removed
     print(dimensions)
     
 
     model = Sequential()
     #input dim specifies the shape of the input as the data is only one dimension dim can be used in stead of shape input_shape(dimensions,) is the same
     model.add(layers.Dense(128, input_shape=(dimensions,), activation='relu', name = 'input')) #setsup first hidden layer aswell as defing the input layers shape
-    model.add(layers.Dense(512, activation='relu', name = 'Layer2'))
-    model.add(layers.Dense(256, activation = 'relu', name = 'Layer3'))
-    model.add(layers.Dense(64,activation = 'relu', name='Layer4')) #another hidden layer aslo using the relu function as it is faster than the sigmoid
+    model.add(layers.Dense(256, activation='tanh', name = 'Layer2'))
+    model.add(layers.Dropout(rate=0.2)) #Dropout later removes records at the given rate i.e rate=0.2 1/5 records will randomly be dropped in each epoch to reduce overfitting of the data
+    model.add(layers.Dense(128, activation = 'relu', name = 'Layer3'))
+    model.add(layers.Dense(64,activation = 'tanh', name='Layer4')) #another hidden layer aslo using the relu function as it is faster than the sigmoid
     model.add(layers.Dense(1, name = 'output'))
 
     #Compile defines the loss function, the optimizer and the metrics. That's all.
-    model.compile(loss='mean_squared_error', optimizer='adam', metrics=['mse', 'mae', 'mape'] )
+    model.compile(loss='mse', optimizer='adam', metrics=['mse', 'mae', 'mape'] )
 
 
     print(training_data.head(5))
@@ -82,6 +89,9 @@ def create_model(training_data):
     
     model.fit(training_data,target, epochs = 150, batch_size = 10)
 
+    prediction = model.predict(test.drop(labels=['Symbol','Date','fiscalDateEnding','Target'],axis = 1,inplace =False))
+    print(test)
+    print(prediction)
     return
 
 def main(symbol):

@@ -47,7 +47,6 @@ def calc_rsi(symbol,interval):
     # This is cutlers RSI not Wilders RSI as cutlers dosen't change based on the starting point
 
     data = query('SELECT * FROM DAILY WHERE Symbol = "{}" ORDER BY DATE ASC'.format(symbol))
-    print(data)
     RSI = pd.Series()
     RSI = ta.RSI(data['Close'],interval)
 
@@ -71,8 +70,7 @@ def query(query):
     return
 
 
-def main():
-    symbol = "GOOGL"
+def main(symbol):
     indicators = query('SELECT * FROM DAILY WHERE Symbol = "{}" ORDER BY DATE ASC'.format(symbol))
     indicators["CLOSE_SMA_14"] = price_sma(symbol,14)
     indicators["CLOSE_SMA_7"] = price_sma(symbol,7)
@@ -80,13 +78,14 @@ def main():
     indicators["ATR_14"] = calc_atr(symbol,14)
     indicators['EMA_14'] = calc_ema(symbol,14)
     indicators['EMA_7'] = calc_ema(symbol,7)
+    indicators['RSI_52'] = calc_rsi(symbol,52)
     indicators['RSI_14'] = calc_rsi(symbol,14)
     indicators['RSI_7'] = calc_rsi(symbol,7)
 
+    print("---- INDICATORS ----")
     print(indicators)
-    
 
     return indicators
 
 if __name__ == "__main__":
-    main()
+    main("GOOGL")

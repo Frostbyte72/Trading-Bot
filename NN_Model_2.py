@@ -68,7 +68,29 @@ def prepare_data(dataset):
         dataset[str(col)] = dataset[str(col)].fillna(0)
         if dataset[str(col)].all() == dataset[str(col)].iloc[0]: #if all values are the same remove
             dataset.drop(labels=str(col),axis=1,inplace=True)
+            continue
 
+
+                #Normalise the Data
+        min = dataset[str(col)].min()
+
+        #if min is <0 add i add the absoloute value of the min to all records so you only have poistive values whilst keeping the scale.
+        if min <0:
+            dataset[str(col)] = dataset[str(col)].apply(lambda x: x + abs(min))
+            print('herro' + str(col))
+        
+        max = dataset[str(col)].max()
+        min = dataset[str(col)].min() #needs recalculating as it may have changed
+
+
+        dataset[str(col)] = dataset[str(col)].apply(lambda x: (x-abs(min))/(abs(max)-abs(min)))
+
+        print(dataset[str(col)].max())
+        print(dataset[str(col)].min())
+
+    print(dataset.head(5))
+
+    return dataset
 
 #Data needs reshaing as RNN requires sequence data
 #in RNN, GRU and LSTM, input is of shape t, where N is the number of samples, T is length of time sequence and D is the number of features.
@@ -80,6 +102,7 @@ def shape_data(training_data,time_step,columns):
         temp = training_data.iloc[index-1:index-1+time_step,:].to_numpy()
         shaped_data.append(temp)
         
+    #remove the last time_step elements from the lsit as they won't be the correct shape.
     shaped_data = shaped_data[:-time_step]
     
     shaped_data = np.reshape(shaped_data,(len(shaped_data),time_step,columns))
@@ -130,7 +153,7 @@ def explainer(target,x_train,features):
 
     return importance
     
-def main(symbol):
+def main(symbol,explain):
     training_data = organise_data(symbol)
     time_step = 60 #time step of 7 will mean that the last rolling weeks data is used to predict the price
     
@@ -143,10 +166,12 @@ def main(symbol):
     print(list(training_data.columns))
     columns = training_data.shape[-1] #the size of the datframe's columns after redundent columns have been removed
 
+    #prepare the data
+    training_data = prepare_data(training_data)
 
     #Reshape Data
     x_train = shape_data(training_data,time_step,columns) 
-    return
+    
     #shape,loss_function,optimiser,learning_rate,layer_size,activation,dropout
     model = create_model((time_step,columns),'mse','adam',0.001,32,'tanh',0.2)
 
@@ -168,6 +193,7 @@ def main(symbol):
             model.save('LSTM_Model')
         elif x == 'n':
             break """
+    
 
     importance = explainer(target,x_train,list(training_data.columns))
     print(importance)
@@ -195,4 +221,14 @@ def main(symbol):
     return model
 
 if __name__ == '__main__':
+    f_explain = False
+
+    while x != 'y' or x != 'n':
+            x = input("Explain Feature Importance's ? (y/n): ")
+            if x == 'y':
+                print('Features willl be explianed')
+                f_explain = True
+            elif x == 'n':
+                break
+
     main('GOOGL')

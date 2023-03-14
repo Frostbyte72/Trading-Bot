@@ -82,11 +82,7 @@ def prepare_data(dataset):
         max = dataset[str(col)].max()
         min = dataset[str(col)].min() #needs recalculating as it may have changed
 
-
         dataset[str(col)] = dataset[str(col)].apply(lambda x: (x-abs(min))/(abs(max)-abs(min)))
-
-        print(dataset[str(col)].max())
-        print(dataset[str(col)].min())
 
     print(dataset.head(5))
 
@@ -144,7 +140,7 @@ def explainer(target,x_train,features):
         #remove feature from time series
 
         x_train_adjusted = np.delete(x_train,index,2)
-        model.fit(x_train_adjusted,target, epochs = 100, batch_size = 10,verbose = 0)
+        model.fit(x_train_adjusted,target, epochs = 150, batch_size = 10,verbose = 0)
         results = model.evaluate(x_train_adjusted, target,verbose = 0)
         importance.loc[features[index]] = results
 
@@ -160,14 +156,20 @@ def main(symbol,explain):
     #Create Target
     target = training_data['Target']
     target = target.iloc[0:-time_step]
+
     #Remove unessecary columns
     training_data.drop(labels=['Target','Symbol','Date','fiscalDateEnding'],axis = 1,inplace =True) #Dropping open,close,high annd low resulted in lower loss (I think because they are so close to the price they get weighted heavily when they don't rly effect the next price that much history dosn't equlat the future.)
 
-    print(list(training_data.columns))
-    columns = training_data.shape[-1] #the size of the datframe's columns after redundent columns have been removed
+    #Manually remove Harmful features just creating noise for GOOGL
+    training_data.drop(labels=['profitMargin','changeInCashAndCashEquivalents','profitLoss','operatingCashflow','totalCurrentAssets'],axis = 1, inplace = True)
 
     #prepare the data
+    test_record = training_data.iloc[0]
     training_data = prepare_data(training_data)
+
+    print(len(training_data.columns))
+    columns = training_data.shape[-1] #the size of the datframe's columns after redundent columns have been removed
+
 
     #Reshape Data
     x_train = shape_data(training_data,time_step,columns) 
@@ -181,7 +183,12 @@ def main(symbol,explain):
     print('           Evaluation')
     print('----------------------------------')
     results = model.evaluate(x_train, target)
-    print(results[0])
+    print('Prediction of the first record :')
+    test = np.reshape(x_train[0],(1,time_step,columns))
+    print(test_record)
+    print("Predicted Price for next day's close: ")
+    print(model.predict(test))
+
 
     #Save model 
     """
@@ -193,42 +200,34 @@ def main(symbol,explain):
             model.save('LSTM_Model')
         elif x == 'n':
             break """
+
+
     
+    if explain:
+        print('Running Feature Explainer')
+        importance = explainer(target,x_train,list(training_data.columns))
+        print(importance)
+        #importance['Loss'].apply(lambda x: x - results[0])
+        importance = importance.assign(value = lambda x:(x['Loss'] - results[0]))
 
-    importance = explainer(target,x_train,list(training_data.columns))
-    print(importance)
-    #importance['Loss'].apply(lambda x: x - results[0])
-    importance = importance.assign(value = lambda x:(x['Loss'] - results[0]))
-
-    plt.barh(list(importance.index.values),importance['value'].tolist(),color ='maroon')
-    plt.xlabel('Feature')
-    plt.ylabel('Chage in Loss')
-    plt.show()
-
-
-    #The below SHAP code dosn't work for LSTMs
-    """
-    features = list(training_data.columns)
-
-    shap.initjs()
-
-    explainer = shap.DeepExplainer(model)
-    shap_values = explainer.shap_values(x_train)
-
-    shap.force_plot(explainer.expected_value, shap_values[0,:], features)
-    shap.summary_plot(shap_values, X, plot_type="bar") """
+        plt.barh(list(importance.index.values),importance['value'].tolist(),color ='maroon')
+        plt.xlabel('Change to MSE loss')
+        plt.title('Feature Importance')
+        plt.show()
 
     return model
 
 if __name__ == '__main__':
-    f_explain = False
+    explain = False
 
+    x = ''
     while x != 'y' or x != 'n':
             x = input("Explain Feature Importance's ? (y/n): ")
             if x == 'y':
-                print('Features willl be explianed')
-                f_explain = True
+                print('Features will be explianed')
+                explain = True
+                break
             elif x == 'n':
                 break
 
-    main('GOOGL')
+    main('GOOGL',explain)

@@ -21,7 +21,7 @@ def organise_data(symbol):
     #join fundamental data to each day in technical
 
     last_report_no = 0
-    training_data = pd.DataFrame()
+    dataset = pd.DataFrame()
     #set intial date in datetime datatype
     length = len(technical)-1 #-1 to account for zero indexing
     report_date = datetime.strptime(fundemental['fiscalDateEnding'].iloc[0], '%Y-%m-%d')
@@ -42,48 +42,52 @@ def organise_data(symbol):
             report_date = datetime.strptime(fundemental['fiscalDateEnding'].iloc[last_report_no], '%Y-%m-%d')
 
         row = row.append(fundemental.iloc[last_report_no])
-        training_data = training_data.append(row,ignore_index=True)
+        dataset = dataset.append(row,ignore_index=True)
     
-        
-
-    ########################## needs updating to split the data frame into 2 parts one for testing one for training i.e 80% train 20%test
-    
-    #fraction of training data to be used for testing
-    """test_split = 0.1
-    test_data = training_data.iloc[training_data.shape[0]-int(training_data.shape[0] * test_split):-1,:]
-    traning_data = training_data.iloc[0:training_data.shape[0]-int(training_data.shape[0] * test_split)]"""
     
     #removes the frist row for the last known day of trading as we don't yet know tommorows close so it can have no taget value and thus useless training
-    training_data.drop(index = 0,axis=0,inplace=True)
+    dataset.drop(index = 0,axis=0,inplace=True)
 
 
-    print(training_data.head(5))
-    return training_data
+    print(dataset.head(5))
+    return dataset
+
+def split_data(dataset):
+    #fraction of training data to be used for testing
+    test_split = 0.1
+
+    split_point = int(dataset.shape[0] - (dataset.shape[0] * test_split))
+    
+    test_data = dataset[split_point:-1]
+
+
+    training_data = dataset[0:split_point]
+
+    return test_data, training_data
 
 # --- Prepares the data for the neural network ---
 # Cleans data by removing null values and data that dosn't change
 # also scales the data using the min max range to ensure that for any datapoint x in the data set is -1<=x<=1
 def prepare_data(dataset):
     for col in list(dataset.columns):
-        dataset[str(col)] = dataset[str(col)].fillna(0)
+        dataset[str(col)].fillna(value = 0,inplace = True)
         if dataset[str(col)].all() == dataset[str(col)].iloc[0]: #if all values are the same remove
             dataset.drop(labels=str(col),axis=1,inplace=True)
             continue
 
-
-                #Normalise the Data
+        
+        #Normalise the Data
         min = dataset[str(col)].min()
 
         #if min is <0 add i add the absoloute value of the min to all records so you only have poistive values whilst keeping the scale.
         if min <0:
             dataset[str(col)] = dataset[str(col)].apply(lambda x: x + abs(min))
-            print('herro' + str(col))
         
         max = dataset[str(col)].max()
         min = dataset[str(col)].min() #needs recalculating as it may have changed
 
         dataset[str(col)] = dataset[str(col)].apply(lambda x: (x-abs(min))/(abs(max)-abs(min)))
-
+        
     print(dataset.head(5))
 
     return dataset
@@ -148,64 +152,69 @@ def explainer(target,x_train,features):
         model.set_weights(inital_weights)
 
     return importance
-    
-def main(symbol,explain):
-    training_data = organise_data(symbol)
-    time_step = 60 #time step of 7 will mean that the last rolling weeks data is used to predict the price
+
+#Arguments Decscirptions:
+#-----------------------
+# Symbol = String - Ticker of the stock/fund (List avalible at: https://www.alphavantage.co/documentation/)
+# explain = Boolean - explain the features importance of the model
+# plot = Boolean - Plot the Models prediction against actual values
+# epochs = int - No. of epochs
+# batch_size  = int - size of batch
+# time_step = int - how many previous days tradying are provided to the LSTM model (time step of 7 will mean that the last rolling weeks data is used to predict the price)
+# All other arguments are optional arguments for the keras model creation 
+def main(symbol,explain = False,plot= False,epochs = 150, batch_size =10,time_step = 7,loss_function = 'mse',optimiser = 'adam',learning_rate = 0.001,layer_size = 32, activation = 'tanh',dropout = 0.2):
+    dataset = organise_data(symbol)
     
     #Create Target
-    target = training_data['Target']
+    target = dataset['Target']
+    close = dataset['Close']
     target = target.iloc[0:-time_step]
 
+    y_test , y_train = split_data(target) 
+
     #Remove unessecary columns
-    training_data.drop(labels=['Target','Symbol','Date','fiscalDateEnding'],axis = 1,inplace =True) #Dropping open,close,high annd low resulted in lower loss (I think because they are so close to the price they get weighted heavily when they don't rly effect the next price that much history dosn't equlat the future.)
+    dataset.drop(labels=['Target','Symbol','Date','fiscalDateEnding'],axis = 1,inplace =True) #Dropping open,close,high annd low resulted in lower loss (I think because they are so close to the price they get weighted heavily when they don't rly effect the next price that much history dosn't equlat the future.)
 
     #Manually remove Harmful features just creating noise for GOOGL
-    training_data.drop(labels=['profitMargin','changeInCashAndCashEquivalents','profitLoss','operatingCashflow','totalCurrentAssets'],axis = 1, inplace = True)
+    #dataset.drop(labels=['profitMargin','changeInCashAndCashEquivalents','profitLoss','operatingCashflow','totalCurrentAssets'],axis = 1, inplace = True)
 
-    #prepare the data
-    test_record = training_data.iloc[0]
-    training_data = prepare_data(training_data)
+    #prepare and clean the data
+    dataset = prepare_data(dataset)
 
-    print(len(training_data.columns))
-    columns = training_data.shape[-1] #the size of the datframe's columns after redundent columns have been removed
-
+    print(len(dataset.columns))
+    columns = dataset.shape[-1] #the size of the datframe's columns after redundent columns have been removed
 
     #Reshape Data
-    x_train = shape_data(training_data,time_step,columns) 
-    
-    #shape,loss_function,optimiser,learning_rate,layer_size,activation,dropout
-    model = create_model((time_step,columns),'mse','adam',0.001,32,'tanh',0.2)
+    x = shape_data(dataset,time_step,columns) 
 
-    model.fit(x_train, target, epochs = 150, batch_size = 10)
+    #splitdata
+    x_test , x_train = split_data(x)
+
+    #shape,loss_function,optimiser,learning_rate,layer_size,activation,dropout
+    model = create_model((time_step,columns),loss_function,optimiser,learning_rate,layer_size,activation,dropout)
+
+    model.fit(x_train, y_train, epochs = epochs, batch_size = batch_size)
 
     print('==================================')
     print('           Evaluation')
     print('----------------------------------')
-    results = model.evaluate(x_train, target)
-    print('Prediction of the first record :')
-    test = np.reshape(x_train[0],(1,time_step,columns))
-    print(test_record)
-    print("Predicted Price for next day's close: ")
-    print(model.predict(test))
+    results = model.evaluate(x_test , y_test)
+
+    train_price = model.predict(x_train)
+    test_price = model.predict(x_test)
 
 
-    #Save model 
-    """
-    x = ''
-    while x != 'y' or x != 'n':
-        x = input("Save Model (y/n): ")
-        if x == 'y':
-            print('Model Saved')
-            model.save('LSTM_Model')
-        elif x == 'n':
-            break """
 
-
+    if plot:
+        #add plot of crossvalidated predictions
+        plt.plot(range(0,x_train.shape[0]),train_price, label = 'Train Price')
+        plt.plot(range(x_train.shape[0],(x_train.shape[0] + x_test.shape[0])),test_price, label = 'Test Price')
+        plt.plot(range(0,dataset.shape[0]),close, label = 'Actual Price' )
+        plt.show()
     
     if explain:
         print('Running Feature Explainer')
-        importance = explainer(target,x_train,list(training_data.columns))
+        importance = explainer(y_train,x_train,list(dataset.columns))
         print(importance)
         #importance['Loss'].apply(lambda x: x - results[0])
         importance = importance.assign(value = lambda x:(x['Loss'] - results[0]))
@@ -215,19 +224,8 @@ def main(symbol,explain):
         plt.title('Feature Importance')
         plt.show()
 
-    return model
+    return results
 
 if __name__ == '__main__':
     explain = False
-
-    x = ''
-    while x != 'y' or x != 'n':
-            x = input("Explain Feature Importance's ? (y/n): ")
-            if x == 'y':
-                print('Features will be explianed')
-                explain = True
-                break
-            elif x == 'n':
-                break
-
     main('GOOGL',explain)

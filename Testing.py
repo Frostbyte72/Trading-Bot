@@ -31,7 +31,7 @@ def test_batch_size():
     print(x)
     print(results) 
     plt.plot(x,results,color= 'deeppink')
-    plt.xlabel('Batch Size 2-128')
+    plt.xlabel('Batch Size')
     plt.ylabel('Loss (MSE)')
     plt.savefig('Batch.png')
 
@@ -46,29 +46,46 @@ def test_epoch_size():
     print(x)
     print(results)
     plt.plot(x,results,color= 'indigo')
-    plt.xlabel('Batch Size 2-128')
+    plt.xlabel('Epoch Size')
     plt.ylabel('Loss (MSE)')
     plt.savefig('Epoch.png')
 
-def test_learning_rate():
-
+def test_optimisers():
+    optimisers = ['sgd','rmsprop','adam','adamw','adadelta','adagrad','adamax','adafactor','nadam','ftrl']
     results= []
+
+    for i in optimisers:
+        result = NN.main(plot = False ,symbol = 'GOOGL',activation='tanh',optimiser = i)
+        results.append(result[0])
+
+    print(results)
+    plt.clf() 
+    plt.bar(optimisers,results,color= 'green')
+    plt.xlabel('Gradient Decent Function')
+    plt.ylabel('Loss (MSE)')
+    for i in range(len(optimisers)):
+        plt.text(i, results[i]//2, ("%.2f" % results[i]), ha = 'center')
+    plt.savefig('optimisers.png')
 
 def test_timestep():
     x = list(range(2,129,4))
     results = []
     for i in x:
-        result = NN.main(plot = False ,symbol = 'GOOGL',activation='tanh',epochs = i)
+        result = NN.main(plot = False ,symbol = 'GOOGL',activation='tanh',time_step = i)
         results.append(result[0])
     
     plt.clf()
     print(x)
     print(results)
     plt.plot(x,results,color= 'blue')
-    plt.xlabel('Batch Size 2-128')
+    plt.xlabel('Timestep')
     plt.ylabel('Loss (MSE)')
-    plt.savefig('Epoch.png')
+    plt.savefig('Timestep.png')
 
-#test_activation_functions()
+
+
+test_activation_functions()
 test_batch_size()
 test_epoch_size()
+test_timestep()
+test_optimisers()

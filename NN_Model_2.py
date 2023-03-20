@@ -9,6 +9,7 @@ from tensorflow.keras import layers
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
+
 def organise_data(symbol):
     
     fundemental = query('SELECT * FROM FUNDEMENTAL WHERE Symbol = "{}" ORDER BY fiscalDateEnding DESC'.format(symbol))
@@ -214,14 +215,15 @@ def main(symbol,explain = False,plot= False,epochs = 150, batch_size =10,time_st
     
     if explain:
         print('Running Feature Explainer')
+
         importance = explainer(y_train,x_train,list(dataset.columns))
         print(importance)
         #importance['Loss'].apply(lambda x: x - results[0])
         importance = importance.assign(value = lambda x:(x['Loss'] - results[0]))
 
         plt.barh(list(importance.index.values),importance['value'].tolist(),color ='maroon')
-        plt.xlabel('Change to MSE loss')
-        plt.title('Feature Importance')
+        plt.xlabel('Loss (MSE)')
+        plt.title('Feature Importance for {}'.format(symbol))
         plt.show()
 
     return results

@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import NN_Model_2 as NN
 
 def test_activation_functions():
+    print('Testing Diffferent Activation Functions')
     activations = ['elu','gelu','hard_sigmoid','relu','selu','sigmoid','swish','tanh']
     results = []
     for act in activations:
@@ -21,6 +22,7 @@ def test_activation_functions():
     plt.savefig('Activation.png')
 
 def test_batch_size():
+    print('Testing Diffferent batch sizes')
     x = list(range(2,128,4))
     results = []
     for i in x:
@@ -36,6 +38,7 @@ def test_batch_size():
     plt.savefig('Batch.png')
 
 def test_epoch_size():
+    print('Testing Diffferent epoch sizes')
     x = list(range(10,251,10))
     results = []
     for i in x:
@@ -50,7 +53,9 @@ def test_epoch_size():
     plt.ylabel('Loss (MSE)')
     plt.savefig('Epoch.png')
 
+#untested
 def test_optimisers():
+    print('Testing Diffferent optimisers')
     optimisers = ['sgd','rmsprop','adam','adamw','adadelta','adagrad','adamax','adafactor','nadam','ftrl']
     results= []
 
@@ -67,7 +72,9 @@ def test_optimisers():
         plt.text(i, results[i]//2, ("%.2f" % results[i]), ha = 'center')
     plt.savefig('optimisers.png')
 
+#untested
 def test_timestep():
+    print('Testing Diffferent Timestep lengths')
     x = list(range(2,129,4))
     results = []
     for i in x:
@@ -83,9 +90,31 @@ def test_timestep():
     plt.savefig('Timestep.png')
 
 
+def test_layer_size():
+    print('testing different layer sizes')
 
-test_activation_functions()
-test_batch_size()
-test_epoch_size()
-test_timestep()
-test_optimisers()
+    x = []
+    #exponential increase in range
+    for i in range(1,10):
+        x.append(2 ** i)
+
+    results = []
+    for size in x:
+        result = NN.main(plot = False ,symbol = 'GOOGL',layer_size = size)
+        results.append(result[2])
+
+    plt.clf()
+    print(x)
+    print(results)
+    plt.plot(x,results,color= 'blue')
+    plt.xlabel('Layer_size')
+    plt.ylabel('Loss (MAE)')
+    plt.savefig('Layer.png')
+
+#loss function testing
+#test_activation_functions()
+#test_batch_size()
+#test_epoch_size()
+#test_timestep()
+#test_optimisers()
+test_layer_size()

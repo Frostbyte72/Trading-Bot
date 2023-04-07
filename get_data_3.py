@@ -204,8 +204,14 @@ def Insert_Into_db(cursor,con,Values,SQL):
         print(Values)
         con.commit()
     except Exception as e:
-        if str(e) == "UNIQUE constraint failed: TRADE_DATA.Symbol, TRADE_DATA.Date" or str(e) == "UNIQUE constraint failed: DAILY.Symbol, DAILY.Date" or str(e) == "UNIQUE constraint failed: OVERVIEW.Symbol" or str(e) == "UNIQUE constraint failed: FUNDEMENTAL.Symbol, FUNDEMENTAL.fiscalDateEnding":
+        e = str(e)
+        if e == "UNIQUE constraint failed: TRADE_DATA.Symbol, TRADE_DATA.Date" or e == "UNIQUE constraint failed: DAILY.Symbol, DAILY.Date" or e == "UNIQUE constraint failed: OVERVIEW.Symbol" or e == "UNIQUE constraint failed: FUNDEMENTAL.Symbol, FUNDEMENTAL.fiscalDateEnding":
             return True
+        elif e == 'database is locked':
+            #databse is locked try reconnecting
+            cursor.close()
+            con.close()
+            con , cursor = connect_to_db()
         else:
             print("ERROR when inserting Values: {}".format(e))
             return False
@@ -217,31 +223,51 @@ def main(symbol):
 
     con , cursor = connect_to_db()
 
-    #Collecting Fundemental anyalsis data
-    income = get_income_statments(symbol)
-    balance = get_balance_sheets(symbol)
-    cash = get_cash_flow(symbol)
+    try:
+        #Collecting Fundemental anyalsis data
+        income = get_income_statments(symbol)
+        balance = get_balance_sheets(symbol)
+        cash = get_cash_flow(symbol)
+        #Collecting daily price data
+        daily = get_daily(symbol)
+    except Exception as e:
+        e = str(e)
+        if e[1:8] == 'None of':
+            print('Too Many API Calls try wating: Limits are 5 requests per minute 500 a day.')
+            con.commit()
+            cursor.close()
+            con.close()
+            raise Exception(e)
+        else:
+            raise Exception(e)
     #join the fundmental data together
     temp = pd.merge(income,balance, how="left", on="fiscalDateEnding")
     fundamentals = pd.merge(temp,cash, how="left", on="fiscalDateEnding")
-    print(fundamentals)
     
     #0 = return on equity (ROE) , 1 = Profit Margin ,2 = return on investment (ROI), 3 = dividends per share (DPS)
     calculated = [[],[],[],[]]
     for i in range(0,fundamentals.shape[0]):
-        ROE = float(fundamentals['netIncome'].iloc[i])/( (float(fundamentals['totalAssets'].iloc[i])) - float(fundamentals['totalLiabilities'].iloc[i]) )
+        if fundamentals['netIncome'].iloc[i] == 'None' or fundamentals['totalAssets'].iloc[i] == 'None' or fundamentals['totalLiabilities'].iloc[i] == 0:
+            ROE = 0
+        elif (float(fundamentals['totalAssets'].iloc[i])) - float(fundamentals['totalLiabilities'].iloc[i]) == 0: 
+            ROE = 0
+        else:
+            ROE = float(fundamentals['netIncome'].iloc[i])/( (float(fundamentals['totalAssets'].iloc[i])) - float(fundamentals['totalLiabilities'].iloc[i]) )
         calculated[0].append(ROE)
         
-        profit_margin = float(fundamentals['grossProfit'].iloc[i] ) / float(fundamentals['totalRevenue'].iloc[i])
+        if fundamentals['grossProfit'].iloc[i] == 'None' or fundamentals['totalRevenue'].iloc[i] == 'None' or float(fundamentals['totalRevenue'].iloc[i]) == 0:
+            profit_margin = 0
+        else:
+            profit_margin = float(fundamentals['grossProfit'].iloc[i] ) / float(fundamentals['totalRevenue'].iloc[i])
         calculated[1].append(profit_margin)
 
-        if fundamentals['investments'].iloc[i] == 'None':
+        if fundamentals['investments'].iloc[i] == 'None' or fundamentals['cashflowFromInvestment'].iloc[i] == 'None' or float(fundamentals['investments'].iloc[i]) == 0:
             ROI = 0
         else:
             ROI = float(fundamentals['cashflowFromInvestment'].iloc[i]) / float(fundamentals['investments'].iloc[i])
         calculated[2].append(ROI)
 
-        if fundamentals['dividendPayout'].iloc[i] == 'None':
+        if fundamentals['dividendPayout'].iloc[i] == 'None' or fundamentals['commonStock'].iloc[i] == 'None' or float(fundamentals['commonStock'].iloc[i]) == 0:
             DPS = 0
         else:
             DPS = float(fundamentals['dividendPayout'].iloc[i]) / (float(fundamentals['commonStock'].iloc[i]))
@@ -265,17 +291,18 @@ def main(symbol):
         Insert_Into_db(cursor,con,values,'''Insert INTO FUNDEMENTAL(Symbol,fiscalDateEnding, grossProfit, totalRevenue, operatingIncome, netIncome, ebitda, totalAssets, totalCurrentAssets, investments, totalLiabilities, totalShareholderEquity, treasuryStock, retainedEarnings, commonStock, commonStockSharesOutstanding, operatingCashflow, profitLoss, paymentsForRepurchaseOfCommonStock, paymentsForRepurchaseOfPreferredStock, dividendPayout, proceedsFromIssuanceOfCommonStock, proceedsFromIssuanceOfPreferredStock, cashflowFromInvestment, changeInCashAndCashEquivalents, ROE, profitMargin, ROI, DPS) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ''')
 
     ### Update/Get day by day prices for all of time
-    daily = get_daily(symbol)
     for _,row in daily.iterrows():
         values = []
         values.append(symbol)
         values.extend(row.tolist())
         Insert_Into_db(cursor,con,values,'''Insert INTO DAILY(Symbol,Open,High,Low,Close,Volume,Date) VALUES(?,?,?,?,?,?,?) ''')
 
+    con.commit()
+    cursor.close()
     con.close()
     print("DATA UPDATED")
     
-    return
+    return True
 
 if __name__ == '__main__':
     main(input('Ticker of company to get: '))

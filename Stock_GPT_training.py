@@ -53,7 +53,6 @@ def organise_data(symbol):
     dataset.drop(index = 0,axis=0,inplace=True)
 
 
-    print(dataset.head(5))
     return dataset
 
 def split_data(dataset):
@@ -179,31 +178,6 @@ def transformer_encoder(inputs, head_size, num_heads, ff_dim, dropout=0):
     return x + res
 
 
-#shapley addative explinations
-#importance of feature A = loss(A,B,C) - loss(B,C)
-#https://towardsdatascience.com/a-novel-approach-to-feature-importance-shapley-additive-explanations-d18af30fc21b
-def explainer(target,x_train,features):
-    print(len(features))
-
-    importance = pd.DataFrame(columns = ['Loss','mse','mae','mape'])
-    #Create a new model minus one feature
-    model = create_model((x_train.shape[1],x_train.shape[2]-1),'mse','adam',0.001,32,'tanh',0.2)
-    inital_weights = model.get_weights()
-    #Run the trails for each - one of the features
-    for index in tqdm(range(0,len(features)),desc = 'Calcualting Feature Importance' ):
-        #remove feature from time series
-
-        x_train_adjusted = np.delete(x_train,index,2)
-        model.fit(x_train_adjusted,target, epochs = 150, batch_size = 10,verbose = 0)
-        results = model.evaluate(x_train_adjusted, target,verbose = 0)
-        importance.loc[features[index]] = results
-
-        #reset the mdoel to the same initial weights
-        model.set_weights(inital_weights)
-
-    return importance
-
-
 #Arguments Decscirptions:
 #-----------------------
 # Symbol = String - Ticker of the stock/fund (List avalible at: https://www.alphavantage.co/documentation/)
@@ -213,22 +187,35 @@ def explainer(target,x_train,features):
 # batch_size  = int - size of batch
 # time_step = int - how many previous days tradying are provided to the LSTM model (time step of 7 will mean that the last rolling weeks data is used to predict the price)
 # All other arguments are optional arguments for the keras model creation 
-def main(tickers,update = False,explain = False,plot= False,epochs = 150, batch_size =10,time_step = 7,loss_function = 'mse',optimiser = 'adam',learning_rate = 0.001,layer_size = 32, activation = 'tanh',dropout = 0.1):
+def main(tickers,update = False,plot= False,epochs = 150, batch_size =10,time_step = 7,loss_function = 'mse',optimiser = 'adam',learning_rate = 0.001,layer_size = 32, activation = 'tanh',dropout = 0.1):
     
     dataset = np.array(())
     count = 1
     target = pd.Series()
-    start = time.time()
     for ticker in tickers['Symbol']:
+        print('dataset Size: {}'.format(dataset.shape))
+        print('Ticker Count: {}'.format(count))
+        print('Ticker : {}'.format(ticker))
         if update:
-            if count/2 == int((count/2)):
+            """if count/2 == int((count/2)):
                 print('waiting for call limit to restart')
-                while time.time() < (start+60):
-                    time.sleep(1)
-                    
-            #update records
-            get_data(ticker)
-            ticker_data = organise_data(ticker)
+                time.sleep(60)"""
+            print('Update is on')
+            try:
+                #update records
+                print('Trying')
+                get_data(ticker)
+                ticker_data = organise_data(ticker)
+            except Exception as e:
+                e = str(e)
+                if e[1:8] == 'None of':
+                    print('EXCEDED API CALL LIMIT')
+                    time.sleep(60)
+                    get_data(ticker)
+                    ticker_data = organise_data(ticker)
+                else:
+                    print('Exception')
+                    raise Exception(e)
         else:
             ticker_data = organise_data(ticker)
 
@@ -236,8 +223,6 @@ def main(tickers,update = False,explain = False,plot= False,epochs = 150, batch_
         ticker_data['Target'] = ticker_data['Close'].diff(periods=-1)
         temp = ticker_data['Target'].iloc[0:-(time_step+1)] #plus one to account for record that is dropped beacause of the change in price.
         target = pd.concat([target,temp])
-        print(target.head(5))
-        print(target.tail(5))
 
         #remove un-needed columns
         ticker_data.drop(labels=['Target','Symbol','Date','fiscalDateEnding'],axis = 1,inplace =True)
@@ -254,16 +239,15 @@ def main(tickers,update = False,explain = False,plot= False,epochs = 150, batch_
         else:
             dataset = np.concatenate((dataset,x),axis=0)
 
-        print('dataset Size: {}'.format(dataset.shape))
-        print('Ticker Count: {}'.format(count))
         
-        if count == 100:
+        
+        if count == 1000:
             break
 
         count += 1
     
 
-    model = build_model((time_step,columns),head_size =64,num_heads = 4,ff_dim = 4,num_transformer_blocks = 4,mlp_units =[64,64],mlp_dropout=0.4,dropout=0.2)
+    model = build_model((time_step,columns),head_size =64,num_heads = 4,ff_dim = 4,num_transformer_blocks = 4,mlp_units =[64,64,64],mlp_dropout=0.4,dropout=0.2)
 
     model.compile(
     loss="mse",
@@ -288,24 +272,14 @@ def main(tickers,update = False,explain = False,plot= False,epochs = 150, batch_
         plt.ylabel('Daily Change in Price $ (USD)')
         plt.legend()
         plt.show()
-    
-    if explain:
-        print('Running Feature Explainer')
 
-        importance = explainer(y_train,x_train,list(dataset.columns))
-        print(importance)
-        #importance['Loss'].apply(lambda x: x - results[0])
-        importance = importance.assign(value = lambda x:(x['Loss'] - results[0]))
-
-        plt.barh(list(importance.index.values),importance['value'].tolist(),color ='maroon')
-        plt.xlabel('Loss (MSE)')
-        plt.title('Feature Importance for {}'.format(symbol))
-        plt.show()
+    model.save('Stock_GPT_NASDAQ100')
 
     return model,results
 
 if __name__ == '__main__':
-    tickers = pd.read_csv('SNP500.csv')
+    #tickers = pd.read_csv('SNP500.csv')
+    tickers = pd.read_csv('NASDAQ_100.csv')
     print(tickers.head(5))
         
-    main(tickers,update = True ,plot = True,epochs = 150,time_step = 7,batch_size = 10,activation = 'tanh')
+    main(tickers,update = False ,plot = True,epochs = 150,time_step = 7,batch_size = 10,activation = 'tanh')

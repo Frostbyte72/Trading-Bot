@@ -46,10 +46,7 @@ def organise_data(symbol):
 
         row = row.append(fundemental.iloc[last_report_no])
         dataset = dataset.append(row,ignore_index=True)
-    
-    
-    #removes the frist row for the last known day of trading as we don't yet know tommorows close so it can have no taget value and thus useless training
-    dataset.drop(index = 0,axis=0,inplace=True)
+
 
 
     print(dataset.head(5))
@@ -74,11 +71,41 @@ def split_data(dataset):
 def prepare_data(dataset):
 
     #Convert price data to change in price to increase sationairty of the data
-    dataset['Close'] = dataset['Close'].diff(periods=-1)
-    dataset['Open'] = dataset['Open'].diff(periods=-1)
-    dataset['High'] = dataset['High'].diff(periods=-1)
-    dataset['Low'] = dataset['Low'].diff(periods=-1)
-    dataset['Volume'] = dataset['Volume'].diff(periods=-1)
+    dataset['ChangeIn_Close'] = dataset['Close'].diff(periods=-1)
+    dataset['ChangeIn_Open'] = dataset['Open'].diff(periods=-1)
+    dataset['ChangeIn_High'] = dataset['High'].diff(periods=-1)
+    dataset['ChangeIn_Low'] = dataset['Low'].diff(periods=-1)
+    dataset['ChangeIn_Volume'] = dataset['Volume'].diff(periods=-1)
+
+    #drop last record as the value will be null
+    dataset.drop(index=len(dataset)-1,axis=0,inplace = True)
+    dataset.drop(labels=['Close','Open','Low','High','Volume'],inplace= True, axis =1) 
+    
+    ########################
+    # Z score outlier removal
+    mean = dataset['ChangeIn_Close'].mean()
+    std = dataset['ChangeIn_Close'].std()
+    dataset['Zscore'] = dataset['ChangeIn_Close'].apply(lambda x : (x-mean)/std) 
+    print(dataset['Zscore'])
+    print('3X Standard Deviation {}'.format(std*3))
+    dataset = dataset[ (dataset['Zscore'] < 3) & (dataset['Zscore'] > -3 )]
+    print(dataset['Zscore'].max())
+    print(dataset['Zscore'].min())
+    dataset.drop(labels = 'Zscore',axis = 1, inplace = True)
+    #reset index as records are removed in the middle
+    dataset.reset_index(inplace = True)
+    
+
+    #Create Target
+    
+    dataset['Target'] = dataset['ChangeIn_Close'].shift(1)
+    print(dataset[['Target','ChangeIn_Close']])
+    #removes the frist row for the last known day of trading as we don't yet know tommorows close so it can have no taget value and thus useless training
+    dataset.drop(index = 0,axis=0,inplace=True)
+    target = dataset['Target']
+    dataset.drop(labels='Target',axis =1, inplace = True)
+
+
 
     # Remove useless feature
     for col in dataset.columns:
@@ -105,7 +132,7 @@ def prepare_data(dataset):
 
     
 
-    return dataset
+    return dataset, target
 
 #Data needs reshaing as RNN requires sequence data
 #in RNN, GRU and LSTM, input is of shape t, where N is the number of samples, T is length of time sequence and D is the number of features.
@@ -114,12 +141,12 @@ def shape_data(training_data,time_step,columns):
     shaped_data = []
     for index,_ in training_data.iterrows():
         #append next timestep records
-        temp = training_data.iloc[index-1:index-1+time_step,:].to_numpy()
+        temp = training_data.iloc[index:index+time_step,:].to_numpy()
         shaped_data.append(temp)
         
     #remove the last time_step elements from the lsit as they won't be the correct shape.
-    shaped_data = shaped_data[:-time_step]
     
+    shaped_data = shaped_data[:-time_step]
     shaped_data = np.reshape(shaped_data,(len(shaped_data),time_step,columns))
     print("Reshaped Data")
     print(len(shaped_data))
@@ -181,32 +208,30 @@ def explainer(target,x_train,features):
 def main(symbol,explain = False,plot= False,epochs = 150, batch_size =10,time_step = 7,loss_function = 'mse',optimiser = 'adam',learning_rate = 0.001,layer_size = 32, activation = 'tanh',dropout = 0.1):
     dataset = organise_data(symbol)
     
-    #Create Target
-    target = dataset['Target']
-    close = dataset['Close']
-    target = target.iloc[0:-time_step]
-
-    y_test , y_train = split_data(target) 
 
     #Remove unessecary columns
-    dataset.drop(labels=['Target','Symbol','Date','fiscalDateEnding'],axis = 1,inplace =True) #Dropping open,close,high annd low resulted in lower loss (I think because they are so close to the price they get weighted heavily when they don't rly effect the next price that much history dosn't equlat the future.)
+    dataset.drop(labels=['Symbol','Date','fiscalDateEnding'],axis = 1,inplace =True) #Dropping open,close,high annd low resulted in lower loss (I think because they are so close to the price they get weighted heavily when they don't rly effect the next price that much history dosn't equlat the future.)
 
     #Manually remove Harmful features just creating noise for GOOGL
     #dataset.drop(labels=['profitMargin','changeInCashAndCashEquivalents','profitLoss','operatingCashflow','totalCurrentAssets'],axis = 1, inplace = True)
 
     #prepare and clean the data
-    dataset = prepare_data(dataset)
-
-    return
+    dataset,target = prepare_data(dataset)
+    target = target.iloc[0:-(time_step)] #accounts for timestep
+    
+    
 
     print(len(dataset.columns))
+    print(dataset.shape[0])
     columns = dataset.shape[-1] #the size of the datframe's columns after redundent columns have been removed
 
     #Reshape Data
     x = shape_data(dataset,time_step,columns) 
+    print(target.tail(20))
 
     #splitdata
     x_test , x_train = split_data(x)
+    y_test , y_train = split_data(target) 
 
     #shape,loss_function,optimiser,learning_rate,layer_size,activation,dropout
     model = create_model((time_step,columns),loss_function,optimiser,learning_rate,layer_size,activation,dropout)
@@ -225,9 +250,10 @@ def main(symbol,explain = False,plot= False,epochs = 150, batch_size =10,time_st
 
     if plot:
         #add plot of crossvalidated predictions
+        plt.plot(range(0,dataset.shape[0]-time_step),target, label = 'Actual Price' )
         plt.plot(range(0,x_train.shape[0]),train_price, label = 'Train Price')
         plt.plot(range(x_train.shape[0],(x_train.shape[0] + x_test.shape[0])),test_price, label = 'Test Price')
-        plt.plot(range(0,dataset.shape[0]),close, label = 'Actual Price' )
+        plt.title('LSTM Predictions for {}'.format(symbol))
         plt.show()
     
     if explain:
@@ -246,5 +272,5 @@ def main(symbol,explain = False,plot= False,epochs = 150, batch_size =10,time_st
     return results
 
 if __name__ == '__main__':
-    main('AAPL',plot = True,epochs = 150,batch_size = 10,layer_size = 64,activation = 'sigmoid')
+    main('AAPL',plot = True,epochs = 15,batch_size = 10,layer_size = 64,activation = 'sigmoid')
 

@@ -15,14 +15,14 @@ import talib as ta
 #EMA = Closing price x multiplier + EMA (previous day) x (1-multiplier)
 #Multiplier = (2/((Number of ovbservations) +1))
 def calc_atr(stock,interval):
-    data = query('SELECT * FROM TRADE_DATA WHERE Symbol ="{}" ORDER BY Date ASC'.format(stock) )
+    data = query('SELECT * FROM DAILY WHERE Symbol ="{}" ORDER BY Date ASC'.format(stock) )
 
     data['ATR'] = ta.ATR(data['High'],data['Low'],data['Close'],interval)
 
     return data['ATR']
 
 def calc_ema(stock,interval):
-    data = query('SELECT * FROM TRADE_DATA WHERE Symbol ="{}" ORDER BY Date ASC'.format(stock) )
+    data = query('SELECT * FROM DAILY WHERE Symbol ="{}" ORDER BY Date ASC'.format(stock) )
 
     data['EMA'] = ta.EMA(data['Close'], interval)
 
@@ -87,6 +87,7 @@ def query(query):
 
 def main(symbol):
     indicators = query('SELECT * FROM DAILY WHERE Symbol = "{}" ORDER BY DATE ASC'.format(symbol))
+    indicators["CLOSE_SMA_52"] = price_sma(symbol,52)
     indicators["CLOSE_SMA_14"] = price_sma(symbol,14)
     indicators["CLOSE_SMA_7"] = price_sma(symbol,7)
     indicators["VOLUME_SMA_14"] = volume_sma(symbol,14)

@@ -79,8 +79,8 @@ def prepare_data(dataset):
     dataset['ChangeIn_Low'] = dataset['Low'].diff(periods=-1)
     dataset['ChangeIn_Volume'] = dataset['Volume'].diff(periods=-1)
 
-    #drop first record as the difference will be wrong
-    dataset.drop(index=len(dataset)-1,axis=0,inplace = True)
+    #drop last record as the vlaue will be null
+    dataset.drop(index=len(dataset),axis=0,inplace = True)
     dataset.drop(labels=['Close','Open','Low','High','Volume'],inplace= True, axis =1)
 
     for col in dataset.columns:
@@ -221,7 +221,7 @@ def main(tickers,update = False,plot= False,epochs = 150, batch_size =10,time_st
 
         #Change target to daily difference in price
         ticker_data['Target'] = ticker_data['Close'].diff(periods=-1)
-        temp = ticker_data['Target'].iloc[0:-(time_step+1)] #plus one to account for record that is dropped beacause of the change in price.
+        temp = ticker_data['Target'].iloc[0:-(time_step+1)] #plus one to account for record that is dropped form the back beacause of the change in price etc.
         target = pd.concat([target,temp])
 
         #remove un-needed columns
@@ -240,7 +240,7 @@ def main(tickers,update = False,plot= False,epochs = 150, batch_size =10,time_st
             dataset = np.concatenate((dataset,x),axis=0)
 
         
-        
+        #limit amunt of companies added to the dataset mainly used for testing
         if count == 1000:
             break
 
@@ -273,7 +273,7 @@ def main(tickers,update = False,plot= False,epochs = 150, batch_size =10,time_st
         plt.legend()
         plt.show()
 
-    model.save('Stock_GPT_NASDAQ100')
+    model.save('Stock_GPT_NASDAQ100_ts128')
 
     return model,results
 
@@ -281,5 +281,4 @@ if __name__ == '__main__':
     #tickers = pd.read_csv('SNP500.csv')
     tickers = pd.read_csv('NASDAQ_100.csv')
     print(tickers.head(5))
-        
-    main(tickers,update = False ,plot = True,epochs = 150,time_step = 7,batch_size = 10,activation = 'tanh')
+    main(tickers,update = False ,plot = True,epochs = 150,time_step = 128,batch_size = 10,activation = 'tanh')

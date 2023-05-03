@@ -272,5 +272,5 @@ def main(symbol,explain = False,plot= False,epochs = 150, batch_size =10,time_st
     return results
 
 if __name__ == '__main__':
-    main('AAPL',plot = True,epochs = 15,batch_size = 10,layer_size = 64,activation = 'sigmoid')
+    main('AAPL',plot = True,epochs = 150,batch_size = 10,layer_size = 64,activation = 'tanh')
 

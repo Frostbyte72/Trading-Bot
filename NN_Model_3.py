@@ -79,7 +79,7 @@ def prepare_data(dataset):
 
     #drop last record as the value will be null
     dataset.drop(index=len(dataset)-1,axis=0,inplace = True)
-    dataset.drop(labels=['Close','Open','Low','High','Volume'],inplace= True, axis =1) 
+    dataset.drop(labels=['Open','Low','High','Volume'],inplace= True, axis =1) 
     
     ########################
     # Z score outlier removal
@@ -98,8 +98,8 @@ def prepare_data(dataset):
 
     #Create Target
     
-    dataset['Target'] = dataset['ChangeIn_Close'].shift(1)
-    print(dataset[['Target','ChangeIn_Close']])
+    dataset['Target'] = dataset['Close'].shift(1)
+    print(dataset[['Target','Close']])
     #removes the frist row for the last known day of trading as we don't yet know tommorows close so it can have no taget value and thus useless training
     dataset.drop(index = 0,axis=0,inplace=True)
     target = dataset['Target']

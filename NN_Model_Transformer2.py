@@ -284,7 +284,7 @@ def main(symbol,update = False,plot= False,epochs = 150, batch_size =10,time_ste
     model.summary()
 
     model.fit(x_train, y_train, epochs = epochs, batch_size = batch_size)
-
+    print("Parameters: act = {act}, opt = {opt}, batch = {batch}, ts = {ts}, layer_size = {ls}".format(act= activation, opt = optimiser,batch = batch_size,ts= time_step, ls = layer_size))
     print('==================================')
     print('           Evaluation')
     print('----------------------------------')
@@ -308,4 +308,4 @@ def main(symbol,update = False,plot= False,epochs = 150, batch_size =10,time_ste
     return model,results
 
 if __name__ == '__main__':
-    main('AAPL',update = False ,plot = True,epochs = 150,time_step = 7,batch_size = 10,activation = 'tanh')
+    main('GOOGL',update = False ,plot = True,epochs = 150,time_step = 7,batch_size = 10,activation = 'swish')

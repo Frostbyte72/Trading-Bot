@@ -206,7 +206,8 @@ def build_model(
     num_transformer_blocks,
     mlp_units,
     dropout=0,
-    mlp_dropout=0
+    mlp_dropout=0,
+    activation = 'tanh'
 ):
     inputs = keras.Input(shape=input_shape)
     x = inputs
@@ -217,7 +218,7 @@ def build_model(
     # Decoder layer ~ not quite sure how this bit works yet
     x = layers.GlobalAveragePooling1D(data_format="channels_first")(x)
     for dim in mlp_units: #MLP = multilayer perceptron
-        x = layers.Dense(dim, activation="tanh")(x)
+        x = layers.Dense(dim, activation=activation)(x)
         x = layers.Dropout(mlp_dropout)(x)
     
     outputs = layers.Dense(1, activation="linear")(x) #outputing the proabaility of belonging to a certain class which is why the loss bassicaly doesn't move becase the output is alwasy between 0-1
@@ -273,11 +274,11 @@ def main(symbol,update = False,plot= False,epochs = 150, batch_size =10,time_ste
     y_test , y_train = split_data(target) 
     x_test , x_train = split_data(x)    
 
-    model = build_model((time_step,columns),head_size =64,num_heads = 4,ff_dim = 4,num_transformer_blocks = 4,mlp_units =[64,64,64],mlp_dropout=0.4,dropout=0.2)
+    model = build_model((time_step,columns),head_size =64,num_heads = 4,ff_dim = 4,num_transformer_blocks = 4,mlp_units =[64,64,64],mlp_dropout=0.4,dropout=0.2,activation = activation)
 
     model.compile(
     loss="mse",
-    optimizer='adam',
+    optimizer=optimiser,
     metrics=['mae','mse','mape'],
     )
 
@@ -308,4 +309,4 @@ def main(symbol,update = False,plot= False,epochs = 150, batch_size =10,time_ste
     return model,results
 
 if __name__ == '__main__':
-    main('GOOGL',update = False ,plot = True,epochs = 150,time_step = 7,batch_size = 10,activation = 'swish')
+    main('AAPL',update = False ,plot = True,epochs = 150,time_step = 7,batch_size = 10,activation = 'tanh')

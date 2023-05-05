@@ -68,19 +68,10 @@ def split_data(dataset):
 # --- Prepares the data for the neural network ---
 # Cleans data by removing null values and data that dosn't change
 # also scales the data using the min max range to ensure that for any datapoint x in the data set is -1<=x<=1
-def prepare_data(dataset):
+def prepare_data(dataset,horizon):
 
-    #Convert price data to change in price to increase sationairty of the data
-    dataset['ChangeIn_Close'] = dataset['Close'].diff(periods=-1)
-    dataset['ChangeIn_Open'] = dataset['Open'].diff(periods=-1)
-    dataset['ChangeIn_High'] = dataset['High'].diff(periods=-1)
-    dataset['ChangeIn_Low'] = dataset['Low'].diff(periods=-1)
-    dataset['ChangeIn_Volume'] = dataset['Volume'].diff(periods=-1)
+   dataset['ChangeIn_Close'] = dataset['Close'].diff(periods=-1)
 
-    #drop last record as the value will be null
-    dataset.drop(index=len(dataset)-1,axis=0,inplace = True)
-    dataset.drop(labels=['Open','Low','High','Volume'],inplace= True, axis =1) 
-    
     ########################
     # Z score outlier removal
     mean = dataset['ChangeIn_Close'].mean()
@@ -92,30 +83,29 @@ def prepare_data(dataset):
     print(dataset['Zscore'].max())
     print(dataset['Zscore'].min())
     dataset.drop(labels = 'Zscore',axis = 1, inplace = True)
-    #reset index as records are removed in the middle
-    dataset.reset_index(inplace = True)
     
 
     #Create Target
+
+    dataset['Target'] = dataset['Close'].shift(horizon)
+    print(dataset[['Target','Close']].head(14))
+
+    dataset = dataset.iloc[horizon:]
+    print(dataset.head(7))
     
-    dataset['Target'] = dataset['Close'].shift(1)
-    print(dataset[['Target','Close']])
-    #removes the frist row for the last known day of trading as we don't yet know tommorows close so it can have no taget value and thus useless training
-    dataset.drop(index = 0,axis=0,inplace=True)
+    #reset index as records are removed in the middle
+    dataset.reset_index(inplace = True)
     target = dataset['Target']
-    dataset.drop(labels='Target',axis =1, inplace = True)
+    dataset.drop(columns=['Target','ChangeIn_Close'],axis =1, inplace = True)
 
 
-
-    # Remove useless feature
     for col in dataset.columns:
         dataset[col].fillna(method = 'backfill',inplace = True) #Replace unkown variables with the last known observation
         if dataset[col].max() == dataset[col].min() or dataset[col].isnull().values.any() == True: #if all values are the same remove or any null
             dataset.drop(labels=col,axis=1,inplace=True)
             print('dropping {}'.format(col))
             continue
-        
-        #Normalise the Data using min max normalisation
+        #Normalise the Data
         min = dataset[col].min()
         
 
@@ -130,9 +120,7 @@ def prepare_data(dataset):
         
     print(dataset.head(5))
 
-    
-
-    return dataset, target
+    return target , dataset
 
 #Data needs reshaing as RNN requires sequence data
 #in RNN, GRU and LSTM, input is of shape t, where N is the number of samples, T is length of time sequence and D is the number of features.
@@ -250,10 +238,11 @@ def main(symbol,explain = False,plot= False,epochs = 150, batch_size =10,time_st
 
     if plot:
         #add plot of crossvalidated predictions
-        plt.plot(range(0,dataset.shape[0]-time_step),target, label = 'Actual Price' )
         plt.plot(range(0,x_train.shape[0]),train_price, label = 'Train Price')
         plt.plot(range(x_train.shape[0],(x_train.shape[0] + x_test.shape[0])),test_price, label = 'Test Price')
+        plt.plot(range(0,dataset.shape[0]-time_step),target, label = 'Actual Price' )
         plt.title('LSTM Predictions for {}'.format(symbol))
+        plt.legend()
         plt.show()
     
     if explain:

@@ -172,7 +172,7 @@ def explainer(target,x_train,features):
 # epochs = int - No. of epochs
 # batch_size  = int - size of batch
 # All other arguments are optional arguments for the keras model creation 
-def main(symbol,explain = False,plot= False,epochs = 150, batch_size =10,loss_function = 'mse',optimiser = 'adam',learning_rate = 0.001,layer_size = 32, activation = 'tanh',dropout = 0.1,horizon = 1):
+def main(symbol,tech = True, fund = False, explain = False,plot= False,epochs = 150, batch_size =10,loss_function = 'mse',optimiser = 'adam',learning_rate = 0.001,layer_size = 32, activation = 'tanh',dropout = 0.1,horizon = 1):
     dataset = organise_data(symbol)
    
 
@@ -181,6 +181,7 @@ def main(symbol,explain = False,plot= False,epochs = 150, batch_size =10,loss_fu
 
     #Manually remove Harmful features just creating noise for GOOGL
     #dataset.drop(labels=['profitMargin','changeInCashAndCashEquivalents','profitLoss','operatingCashflow','totalCurrentAssets'],axis = 1, inplace = True)
+
 
     #prepare and clean the data
     target , dataset = prepare_data(dataset,horizon)
@@ -238,4 +239,4 @@ def main(symbol,explain = False,plot= False,epochs = 150, batch_size =10,loss_fu
     return results
 
 if __name__ == '__main__':
-    main('AAPL',plot = True,epochs = 150,batch_size = 10,layer_size = 64,activation = 'tanh',horizon = 1)
+    main('AAPL',tech = False,plot = True,epochs = 150,batch_size = 10,layer_size = 64,activation = 'tanh',horizon = 1)
